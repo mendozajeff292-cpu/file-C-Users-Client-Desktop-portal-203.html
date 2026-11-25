@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="tl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PinoyCall V3.1 - Admin Panel</title>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+*{box-sizing:border-box;font-family:Inter,system-ui,sans-serif}
+body{margin:0;background:#0f1115;color:white}
+header{background:#ff6b00;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10}
+header b{font-size:21px} header button{background:white;color:#ff6b00;border:0;padding:8px 14px;border-radius:20px;font-weight:700;cursor:pointer}
+.container{max-width:1200px;margin:auto;padding:14px}
+.card{background:#1a1d24;border:1px solid #2a2e38;border-radius:16px;padding:16px}
+.admin-card{background:#7c2d12;border:2px solid #ff6b00}
+input{width:100%;padding:12px;border-radius:10px;border:1px solid #333;background:#0f1115;color:white;margin:6px 0}
+.btn{width:100%;padding:12px;border:0;border-radius:10px;background:#ff6b00;color:white;font-weight:700;cursor:pointer;margin-top:8px}
+.btn-green{background:#00c853}.btn-gray{background:#333}.btn-red{background:#ff3b30}.btn-dark{background:#000}
+.grid{display:grid;grid-template-columns:1fr 330px;gap:14px}
+@media(max-width:850px){.grid{grid-template-columns:1fr}}
+.video-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media(min-width:1000px){.video-grid{grid-template-columns:1fr 1fr 1fr}}
+.video-box{position:relative;background:black;border-radius:12px;overflow:hidden;border:2px solid #333}
+.video-box video{width:100%;height:200px;object-fit:cover;display:block}
+.video-box span{position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,.75);padding:4px 10px;border-radius:20px;font-size:12px}
+.room{background:#22262f;padding:12px;border-radius:12px;display:flex;justify-content:space-between;align-items:center;margin-top:10px}
+.chat-box{height:280px;overflow-y:auto;background:#0f1115;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.msg{background:#2a2e38;padding:8px 12px;border-radius:12px;max-width:90%;font-size:14px}
+.msg.me{background:#ff6b00;align-self:flex-end}
+.flex{display:flex;gap:8px}.flex button{flex:1}
+.hidden{display:none}
+.badge{background:#00c853;padding:3px 8px;border-radius:20px;font-size:11px}
+.badge-admin{background:#ff6b00;padding:3px 8px;border-radius:20px;font-size:11px}
+.user-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #2a2e38}
+.avatar{width:36px;height:36px;background:#ff6b00;border-radius:50%;display:grid;place-items:center;font-weight:800}
+</style>
+</head>
+<body>
+<header><b>🔥 PinoyCall V3.1 - Admin</b><div id="headerUser"></div></header>
+<div class="container">
+
+  <!-- AUTH -->
+  <div id="authPage" class="card" style="max-width:430px;margin:30px auto">
+    <h2 style="margin:0">Firebase Login</h2>
+    <p style="color:#aaa">Admin: jeffrey@gmail.com</p>
+    <input id="displayName" placeholder="Full Name">
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password (6+ chars)">
+    <button class="btn" onclick="register()">Gumawa ng Account</button>
+    <button class="btn btn-gray" onclick="login()">Mag-Login</button>
+    <p id="authMsg" style="color:#ff7675"></p>
+  </div>
+
+  <!-- MAIN -->
+  <div id="mainPage" class="hidden">
+    <div class="card" style="margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div><b id="myName"></b> <span id="myRole"></span><br><small style="color:#aaa">My Peer ID: <span id="myPeerId" style="color:#00ff88">Connecting...</span> | Max: 10 Users</small></div>
+      <button onclick="logout()" style="background:#ff3b30;color:white;border:0;padding:8px 14px;border-radius:20px;cursor:pointer">Logout</button>
+    </div>
+
+    <!-- ADMIN PANEL - LALABAS LANG KUNG IKAW ANG ADMIN -->
+    <div id="adminPanel" class="card admin-card hidden" style="margin-bottom:14px">
+      <h3 style="margin:0">👑 ADMIN PANEL - Ikaw lang nakakakita nito</h3>
+      <p style="font-size:13px;color:#ffcc99">Pwede ka mag-kick, mag-delete ng room, at mag-clear ng chat.</p>
+      <div class="flex">
+        <button class="btn btn-red" onclick="clearAllRooms()">🗑️ Delete Lahat ng Rooms</button>
+        <button class="btn btn-dark" onclick="clearChat()">🧹 Clear Chat ng Room na ito</button>
+        <button class="btn btn-gray" onclick="kickAll()">🚫 Kick Lahat (Except Admin)</button>
+      </div>
+      <div id="adminStats" style="margin-top:10px;font-size:13px"></div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h3 style="margin:0">🎥 Group Video - <span id="roomLabel" style="color:#ffcc00">Walang Room</span> <span id="memberCount" class="badge">0/10</span></h3>
+          <div class="flex" style="margin-top:10px">
+            <input id="roomNameInput" placeholder="Room Name hal. CSS NC II - Batch 1" style="flex:1">
+            <button class="btn btn-green" onclick="createRoom()" style="width:140px;margin:0">+ Create Room</button>
+          </div>
+          <div class="flex" style="margin-top:8px">
+            <button class="btn btn-gray" onclick="copyRoomLink()" style="margin:0">🔗 Copy Room Link</button>
+            <button class="btn btn-red" onclick="leaveRoom()" style="margin:0">Leave Room</button>
+          </div>
+          <div id="videoGrid" class="video-grid" style="margin-top:14px">
+            <div class="video-box"><video id="myVideo" autoplay muted playsinline></video><span>Ikaw</span></div>
+          </div>
+          <div class="flex" style="margin-top:12px">
+            <button class="btn btn-gray" onclick="toggleMic()">🎤 Mic</button>
+            <button class="btn btn-gray" onclick="toggleCam()">📷 Cam</button>
+            <button class="btn btn-gray" onclick="toggleScreen()">🖥️ Share Screen</button>
+          </div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <h3 style="margin:0">💬 Live Chat</h3>
+          <div id="chatBox" class="chat-box"><div style="color:#888;text-align:center">Walang message pa...</div></div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <input id="chatInput" placeholder="Type message..." onkeydown="if(event.key==='Enter') sendChat()">
+            <button class="btn" style="width:110px;margin:0" onclick="sendChat()">Send</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <h3 style="margin:0">🌐 Public Rooms - Live</h3>
+          <div id="roomList"></div>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <h3 style="margin:0">👥 Online Users</h3>
+          <div id="userList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, setDoc, deleteDoc, getDocs, where } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "PASTE MO DITO",
+  authDomain: "PASTE MO DITO",
+  projectId: "PASTE MO DITO",
+  storageBucket: "PASTE MO DITO",
+  messagingSenderId: "PASTE MO DITO",
+  appId: "PASTE MO DITO"
+};
+const ADMIN_EMAIL = "jeffrey@gmail.com"; // <-- PALITAN MO NG EMAIL MO
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let peer, localStream, currentRoomId="", currentRoomName="", myName="", myPeerId="", isAdmin=false;
+let chatUnsub=null, membersUnsub=null, calls={};
+
+window.register = async ()=>{
+  let name=document.getElementById('displayName').value.trim();
+  let email=document.getElementById('email').value.trim();
+  let pass=document.getElementById('password').value;
+  if(!name||!email||!pass) return authMsg.innerText="Punan mo lahat!";
+  try{
+    let cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(cred.user, {displayName:name});
+    await setDoc(doc(db,"users",cred.user.uid), {name, email, online:true, lastSeen: serverTimestamp()});
+    authMsg.style.color="#00ff88"; authMsg.innerText="Account nagawa!";
+  }catch(e){ authMsg.innerText=e.message; }
+}
+window.login = async ()=>{
+  let email=document.getElementById('email').value.trim();
+  let pass=document.getElementById('password').value;
+  try{ await signInWithEmailAndPassword(auth, email, pass); }catch(e){ authMsg.innerText=e.message; }
+}
+window.logout = async ()=>{ if(currentRoomId) await leaveRoom(); if(auth.currentUser) await setDoc(doc(db,"users",auth.currentUser.uid), {online:false}, {merge:true}); await signOut(auth); location.reload(); }
+
+onAuthStateChanged(auth, async (user)=>{
+  if(!user) return;
+  myName = user.displayName || user.email.split('@')[0];
+  isAdmin = user.email === ADMIN_EMAIL;
+  document.getElementById('authPage').classList.add('hidden');
+  document.getElementById('mainPage').classList.remove('hidden');
+  document.getElementById('myName').innerText=myName;
+  document.getElementById('headerUser').innerHTML=`<b>${myName}</b>`;
+  document.getElementById('myRole').innerHTML = isAdmin ? `<span class="badge-admin">👑 ADMIN</span>` : `<span class="badge">STUDENT</span>`;
+  if(isAdmin) document.getElementById('adminPanel').classList.remove('hidden');
+  await setDoc(doc(db,"users",user.uid), {name:myName, email:user.email, online:true, lastSeen: serverTimestamp()}, {merge:true});
+  initPeer(); listenRooms(); listenUsers(); checkUrlRoom();
+});
+
+function listenRooms(){
+  onSnapshot(query(collection(db,"rooms"), orderBy("createdAt","desc")), snap=>{
+    let html=""; let count=0;
+    snap.forEach(d=>{
+      count++;
+      let r=d.data();
+      html+=`<div class="room"><div><b>${r.name}</b><br><small>by ${r.owner} • ${r.members||1}/10</small></div><div style="display:flex;gap:6px"><button onclick="joinRoom('${d.id}','${r.name}')" style="background:#ff6b00;color:white;border:0;padding:8px 12px;border-radius:20px;cursor:pointer">Join</button>${isAdmin?`<button onclick="deleteRoom('${d.id}')" style="background:#ff3b30;color:white;border:0;padding:8px 10px;border-radius:20px;cursor:pointer">🗑️</button>`:''}</div></div>`;
+    });
+    document.getElementById('roomList').innerHTML = html || "<p style='color:#888'>Walang room pa.</p>";
+    if(isAdmin) document.getElementById('adminStats').innerHTML = `📊 Total Rooms: ${count} | Total Users Online: <span id="statUsers"></span>`;
+  });
+}
+function listenUsers(){
+  onSnapshot(collection(db,"users"), snap=>{
+    let html=""; let onlineCount=0;
+    snap.forEach(d=>{
+      let u=d.data(); if(u.online) onlineCount++;
+      html+=`<div class="user-row"><div class="avatar">${(u.name||'U')[0].toUpperCase()}</div><div style="flex:1"><b>${u.name}</b><br><small>${u.online?'🟢 Online':'⚪ Offline'} • ${u.email}</small></div>${isAdmin && u.email!==ADMIN_EMAIL?`<button onclick="kickUser('${d.id}','${u.name}')" style="background:#ff3b30;color:white;border:0;padding:6px 10px;border-radius:20px;cursor:pointer;font-size:12px">Kick</button>`:''}</div>`;
+    });
+    document.getElementById('userList').innerHTML=html;
+    let stat=document.getElementById('statUsers'); if(stat) stat.innerText=onlineCount;
+  });
+}
+
+// --- ADMIN ACTIONS ---
+window.deleteRoom = async (roomId)=>{
+  if(!confirm("Delete mo talaga yung room na to?")) return;
+  await deleteDoc(doc(db,"rooms",roomId));
+  alert("Room deleted!");
+}
+window.clearAllRooms = async ()=>{
+  if(!confirm("Delete mo LAHAT ng rooms?")) return;
+  let snap=await getDocs(collection(db,"rooms"));
+  for(let d of snap.docs) await deleteDoc(doc(db,"rooms",d.id));
+  alert("Lahat ng rooms na-delete na!");
+}
+window.kickUser = async (uid, name)=>{
+  if(!confirm("I-kick mo si "+name+"? Mawawala siya sa online list.")) return;
+  await setDoc(doc(db,"users",uid), {online:false}, {merge:true});
+  if(currentRoomId){
+    // Kick from current room members din
+    let membersSnap=await getDocs(collection(db,"rooms",currentRoomId,"members"));
+    membersSnap.forEach(async m=>{ if(m.data().name===name) await deleteDoc(doc(db,"rooms",currentRoomId,"members",m.id)); });
+  }
+  alert("Na-kick si "+name);
+}
+window.kickAll = async ()=>{
+  if(!confirm("I-kick mo lahat maliban sa Admin?")) return;
+  let snap=await getDocs(collection(db,"rooms",currentRoomId,"members"));
+  for(let d of snap.docs){ if(d.data().peerId!==myPeerId) await deleteDoc(doc(db,"rooms",currentRoomId,"members",d.id)); }
+  alert("Na-kick na lahat!");
+}
+window.clearChat = async ()=>{
+  if(!currentRoomId) return alert("Sumali ka muna sa room!");
+  if(!confirm("Clear mo chat ng room na to?")) return;
+  let snap=await getDocs(collection(db,"rooms",currentRoomId,"chat"));
+  for(let d of snap.docs) await deleteDoc(doc(db,"rooms",currentRoomId,"chat",d.id));
+  alert("Chat cleared!");
+}
+
+// --- ROOMS ---
+window.createRoom = async ()=>{
+  await getStream();
+  let name = document.getElementById('roomNameInput').value.trim() || "Room-"+Math.floor(Math.random()*1000);
+  let ref = await addDoc(collection(db,"rooms"), {name, owner:myName, ownerPeerId: myPeerId, members:1, createdAt: serverTimestamp()});
+  await joinRoom(ref.id, name);
+}
+window.joinRoom = async (roomId, roomName)=>{
+  if(currentRoomId) await leaveRoom();
+  await getStream();
+  currentRoomId=roomId; currentRoomName=roomName;
+  document.getElementById('roomLabel').innerText=roomName;
+  membersUnsub = onSnapshot(collection(db,"rooms",roomId,"members"), snap=>{
+    snap.docChanges().forEach(change=>{
+      if(change.type==='added'){ let m=change.doc.data(); if(m.peerId!==myPeerId) callMember(m.peerId); }
+      if(change.type==='removed'){ let m=change.doc.data(); removeVideo(m.peerId); }
+    });
+    document.getElementById('memberCount').innerText = (snap.size+1)+"/10";
+  });
+  await setDoc(doc(db,"rooms",roomId,"members",myPeerId), {peerId:myPeerId, name:myName, joinedAt: serverTimestamp()});
+  if(chatUnsub) chatUnsub();
+  chatUnsub = onSnapshot(query(collection(db,"rooms",roomId,"chat"), orderBy("createdAt","asc")), snap=>{
+    let box=document.getElementById('chatBox'); box.innerHTML="";
+    snap.forEach(d=>{
+      let c=d.data();
+      box.innerHTML+=`<div class="msg ${c.from===myName?'me':''}"><b style="font-size:11px">${c.from}</b><br>${c.text}</div>`;
+    });
+    box.scrollTop=box.scrollHeight;
+  });
+}
+window.leaveRoom = async ()=>{
+  if(!currentRoomId) return;
+  try{ await deleteDoc(doc(db,"rooms",currentRoomId,"members",myPeerId)); }catch(e){}
+  if(membersUnsub) membersUnsub();
+  if(chatUnsub) chatUnsub();
+  Object.values(calls).forEach(c=>c.close()); calls={};
+  currentRoomId=""; document.getElementById('roomLabel').innerText="Walang Room";
+  document.querySelectorAll('[id^="vid-"]').forEach(el=>el.remove());
+}
+window.copyRoomLink = ()=>{
+  if(!currentRoomId) return alert("Gumawa ka muna ng room!");
+  let link = location.href.split('?')[0] + "?room=" + currentRoomId;
+  navigator.clipboard.writeText(link); alert("Na-copy na! "+link);
+}
+function checkUrlRoom(){
+  let p=new URLSearchParams(location.search);
+  if(p.get('room')) setTimeout(async ()=>{
+    let snap=await getDocs(collection(db,"rooms"));
+    snap.forEach(d=>{ if(d.id===p.get('room')) joinRoom(d.id, d.data().name); });
+  }, 1500);
+}
+
+// --- VIDEO ---
+async function getStream(){
+  if(!localStream) localStream = await navigator.mediaDevices.getUserMedia({video:true,audio:true});
+  document.getElementById('myVideo').srcObject=localStream; return localStream;
+}
+function initPeer(){
+  peer = new Peer(myName.replace(/[^a-zA-Z0-9]/g,'') + "-" + Math.floor(Math.random()*10000));
+  peer.on('open', id=>{ myPeerId=id; document.getElementById('myPeerId').innerText=id; });
+  peer.on('call', call=>{
+    call.answer(localStream);
+    call.on('stream', s=> addVideo(call.peer, s));
+    call.on('close', ()=> removeVideo(call.peer));
+    calls[call.peer]=call;
+  });
+}
+function callMember(peerId){
+  if(calls[peerId]) return;
+  let call = peer.call(peerId, localStream);
+  call.on('stream', s=> addVideo(peerId, s));
+  call.on('close', ()=> removeVideo(peerId));
+  calls[peerId]=call;
+}
+function addVideo(id, stream){
+  if(document.getElementById('vid-'+id)) return;
+  if(document.querySelectorAll('.video-box').length >= 10) return;
+  let div=document.createElement('div'); div.className='video-box'; div.id='vid-'+id;
+  div.innerHTML=`<video autoplay playsinline></video><span>${id}</span>`;
+  div.querySelector('video').srcObject=stream;
+  document.getElementById('videoGrid').appendChild(div);
+}
+function removeVideo(id){ let el=document.getElementById('vid-'+id); if(el) el.remove(); delete calls[id]; }
+window.toggleMic = ()=>{ if(localStream) localStream.getAudioTracks()[0].enabled=!localStream.getAudioTracks()[0].enabled; }
+window.toggleCam = ()=>{ if(localStream) localStream.getVideoTracks()[0].enabled=!localStream.getVideoTracks()[0].enabled; }
+window.toggleScreen = async ()=>{
+  try{
+    let screen = await navigator.mediaDevices.getDisplayMedia({video:true});
+    let track = screen.getVideoTracks()[0];
+    Object.values(calls).forEach(call=>{
+      let sender = call.peerConnection.getSenders().find(s=>s.track && s.track.kind==='video');
+      if(sender) sender.replaceTrack(track);
+    });
+    document.getElementById('myVideo').srcObject=screen;
+    track.onended=()=>{ document.getElementById('myVideo').srcObject=localStream; };
+  }catch(e){}
+}
+window.sendChat = async ()=>{
+  let txt=document.getElementById('chatInput').value.trim();
+  if(!txt || !currentRoomId) return alert("Sumali ka muna sa room!");
+  await addDoc(collection(db,"rooms",currentRoomId,"chat"), {from:myName, text:txt, createdAt: serverTimestamp()});
+  document.getElementById('chatInput').value="";
+}
+</script>
+</body>
+</html>
